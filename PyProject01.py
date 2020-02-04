@@ -66,9 +66,6 @@ class ImageSSIMComparater(ImageComparater):
         if not img1.dtype == img2.dtype or not img1.shape == img2.shape:
             #print ('Invalid compare inputs: left={}{}, right={}{}'.format(img1.dtype, img1.shape, img2.dtype, img2.shape))
             return RESULT_CODE_ERROR;
-
-        #img1 = img1[:,:,3]
-        #img2 = img2[:,:,3]
         
         try:
             bgrScore = compare_ssim(img1, img2, multichannel=True)

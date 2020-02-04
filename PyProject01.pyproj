@@ -24,6 +24,9 @@
     <Compile Include="LocalTest.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="PyImgCmp.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="PyProject01.py" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
