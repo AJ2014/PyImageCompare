@@ -53,20 +53,33 @@ class ImageComparater(object):
     def calculate_diff(self, imagefile1, imagefile2) -> ImageCompareResult:
         return ImageCompareResult('', '', ImageComparater.EQUAL_DIFF_SCORE, [], FileCompareResult.CODE_SUCCESS)
 
+class ImageSimpleComparater(ImageComparater):
+    def calculate_diff(self, imagefile1, imagefile2):
+        img1 = cv2.imread(imagefile1, cv2.IMREAD_UNCHANGED)
+        img2 = cv2.imread(imagefile2, cv2.IMREAD_UNCHANGED)
+        if not img1.dtype == img2.dtype or not img1.shape == img2.shape:
+            return ImageCompareResult(imagefile1, imagefile2, ImageComparater.IGNORE_DIFF_SCORE, img1.shape, FileCompareResult.CODE_WARN, 'dimensions not match')
+        splits = imagefile1.split('\\')
+        filename1 = splits[len(splits) - 1]
+        splits = imagefile2.split('\\')
+        filename2 = splits[len(splits) - 1]
+        if filename1 == filename2:
+            return ImageCompareResult(imagefile1, imagefile2, ImageComparater.EQUAL_DIFF_SCORE, img1.shape)
+        else:
+            return ImageCompareResult(imagefile1, imagefile2, ImageComparater.IGNORE_DIFF_SCORE, img1.shape, FileCompareResult.CODE_ERROR, 'filename not match')
+
 class ImageSSIMComparater(ImageComparater):
     def calculate_diff(self, imagefile1, imagefile2):
         img1 = cv2.imread(imagefile1, cv2.IMREAD_UNCHANGED)
         img2 = cv2.imread(imagefile2, cv2.IMREAD_UNCHANGED)
         if not img1.dtype == img2.dtype or not img1.shape == img2.shape:
             return ImageCompareResult(imagefile1, imagefile2, ImageComparater.IGNORE_DIFF_SCORE, img1.shape, FileCompareResult.CODE_WARN, 'dimensions not match')
-        shape1 = img1.shape
-        shape2 = img2.shape
         try:
             bgrScore = compare_ssim(img1, img2, multichannel=True)
         except ValueError as e:
-            print ('Invalid compare inputs: left={}{}{}, right={}{}{}'.format(imagefile1, img1.dtype, shape1, imagefile2, img2.dtype, shape2))
-            return ImageCompareResult(imagefile1, imagefile2, ImageComparater.IGNORE_DIFF_SCORE, shape1, FileCompareResult.CODE_ERROR, str(e))
-        return ImageCompareResult(imagefile1, imagefile2, 1.0 - bgrScore, shape1)
+            print ('Invalid compare inputs: left={}{}{}, right={}{}{}'.format(imagefile1, img1.dtype, img1.shape, imagefile2, img2.dtype, img2.shape))
+            return ImageCompareResult(imagefile1, imagefile2, ImageComparater.IGNORE_DIFF_SCORE, img1.shape, FileCompareResult.CODE_ERROR, str(e))
+        return ImageCompareResult(imagefile1, imagefile2, 1.0 - bgrScore, img1.shape)
 
 class ImageFileIterator(object):
     def __init__(self, folder):
@@ -99,6 +112,48 @@ class ImageFileIterator(object):
         self.iterator(self.folder)
 
 class ImageFileCompareTask(ImageFileIterator):
+    def __init__(self, imagefile, folder):
+        super().__init__(folder)
+        self.imagefile = imagefile
+        self.comparater = ImageSimpleComparater()
+        self.equal_list = []
+        self.similar_list = []
+        self.warn_list = []
+        self.error_list = []
+
+    def insert_result(self, result: ImageCompareResult):
+        if FileCompareResult.CODE_SUCCESS == result.code:
+            self.equal_list.append(result)
+        elif FileCompareResult.CODE_WARN == result.code:
+            self.warn_list.append(result)
+        elif FileCompareResult.CODE_ERROR == result.code:
+            self.error_list.append(result)
+
+    def process(self, imagefile):
+        result = self.comparater.calculate_diff(self.imagefile, imagefile)
+        self.insert_result(result)
+
+    def start(self):
+        super().start()
+        len_equal = len(self.equal_list)
+        len_error = len(self.error_list)
+        len_warn = len(self.warn_list)
+        print('{}: equal {:d}, warn {:d}, error {:d}'.format(self.imagefile, len_equal, len_warn, len_error))
+        if not len_equal == 0:
+            self.warn_list.clear
+            self.error_list.clear
+        elif not len_error == 0:
+            self.warn_list.clear
+        elif not len_warn == 0:
+            self.error_list.append(self.warn_list[0])
+            self.warn_list.clear
+        else:
+            print('Can\'t get here')
+
+        if len_error > 1:
+            del self.error_list[1:len(self.error_list)]
+
+class ImageFileSSIMCompareTask(ImageFileCompareTask):
     MAX_DIFF_RECORD = 10
 
     def __init__(self, imagefile, folder):
@@ -117,7 +172,10 @@ class ImageFileCompareTask(ImageFileIterator):
             if len(self.warn_list) == 0:
                 self.warn_list.append(result)
         elif FileCompareResult.CODE_SUCCESS == result.code:
-            if ImageComparater.EQUAL_DIFF_SCORE == result.diff:
+            if ImageComparater.IGNORE_DIFF_SCORE == result.diff:
+                #by pass ignore result
+                pass
+            elif ImageComparater.EQUAL_DIFF_SCORE == result.diff:
                 self.equal_list.append(result)
             else:
                 length = len(self.similar_list)
@@ -269,9 +327,9 @@ class ImageFolderCompareTask(ImageFileIterator):
         self.printer.print(file_compare_task)
 
 if __name__ == '__main__':
-    ui_folder = 'launcher'
-    proj_folder = 'future-skin-red'
-    xlsx_filename = 'launcher.xlsx'
+    ui_folder = 'setting'
+    proj_folder = 'future-skin-blue'
+    xlsx_filename = 'setting.xlsx'
 
     comparater = ImageFolderCompareTask(proj_folder, ui_folder, ExcelPrinter(xlsx_filename))
     comparater.start()
