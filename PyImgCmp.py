@@ -82,10 +82,11 @@ class ImageSSIMComparater(ImageComparater):
         return ImageCompareResult(imagefile1, imagefile2, 1.0 - bgrScore, img1.shape)
 
 class ImageFileIterator(object):
-    def __init__(self, folder):
-        if not os.path.isdir(folder):
-            raise ValueError('Invalid input folder {} when init'.format(folder))
-        self.folder = folder
+    def __init__(self, folders):
+        for folder in folders:
+            if not os.path.isdir(folder):
+                raise ValueError('Invalid input folder {} when init'.format(folder))
+        self.folders = folders
 
     def is_imagefile(self, imagepath):
         if not os.path.isfile(imagepath):
@@ -109,11 +110,13 @@ class ImageFileIterator(object):
                 self.process(file)
 
     def start(self):
-        self.iterator(self.folder)
+        for folder in self.folders:
+            print('Iterator folder ', folder)
+            self.iterator(folder)
 
 class ImageFileCompareTask(ImageFileIterator):
-    def __init__(self, imagefile, folder):
-        super().__init__(folder)
+    def __init__(self, imagefile, folders):
+        super().__init__(folders)
         self.imagefile = imagefile
         self.comparater = ImageSimpleComparater()
         self.equal_list = []
@@ -156,8 +159,8 @@ class ImageFileCompareTask(ImageFileIterator):
 class ImageFileSSIMCompareTask(ImageFileCompareTask):
     MAX_DIFF_RECORD = 10
 
-    def __init__(self, imagefile, folder):
-        super().__init__(folder)
+    def __init__(self, imagefile, folders):
+        super().__init__(folders)
         self.imagefile = imagefile
         self.comparater = ImageSSIMComparater()
         self.equal_list = []
@@ -246,21 +249,27 @@ class ExcelPrinter(ResultPrinter):
     SIMILAR_SHEET_NAME = 'similar'
     ERROR_SHEET_NAME = 'error'
 
-    def openxlsx(self, filename) -> Workbook:
-        for file in os.listdir('.'):
+    def openxlsx(self, filepath) -> Workbook:
+        folder = '.'
+        filename = filepath
+        if '\\' in filepath:
+            folder = filepath[:filepath.rindex('\\')]
+            filename = filepath[filepath.rindex('\\') + 1:]
+        
+        for file in os.listdir(folder):
             if os.path.isfile(file):
                 if filename == file:
-                    return load_workbook(filename)
+                    return load_workbook(filepath)
         wbk = Workbook()
-        wbk.save(filename)
-        return load_workbook(filename)
+        wbk.save(filepath)
+        return load_workbook(filepath)
 
-    def __init__(self, filename, default_sheet_name = EQUAL_SHEET_NAME):
-        self.filename = filename
-        self.xlsxfile = self.openxlsx(filename)
+    def __init__(self, filepath, default_sheet_name = EQUAL_SHEET_NAME):
+        self.filepath = filepath
+        self.xlsxfile = self.openxlsx(filepath)
         ws = self.xlsxfile.active
         ws.title = default_sheet_name
-        self.xlsxfile.save(filename)
+        self.xlsxfile.save(filepath)
         self.sheet_dict = dict()
         self.sheet_dict[default_sheet_name] = 0
         self.fill = PatternFill(patternType='solid', fill_type='solid', fgColor=Color('C4C4C4'))
@@ -275,7 +284,7 @@ class ExcelPrinter(ResultPrinter):
                         dims[cell.column_letter] = max(dims.get(cell.column_letter, 0), len(str(cell.value)))
             for col, value in dims.items():
                 ws.column_dimensions[col].width = value
-        self.xlsxfile.save(self.filename)
+        self.xlsxfile.save(self.filepath)
 
     def print_sheet(self, sheet_name, results_list):
         if not sheet_name in self.xlsxfile:
@@ -315,23 +324,27 @@ class ExcelPrinter(ResultPrinter):
         self.finish_print()
 
 class ImageFolderCompareTask(ImageFileIterator):
-    def __init__(self, folder1, folder2, printer: ResultPrinter):
-        super().__init__(folder1)
-        self.otherfolder = folder2
+    def __init__(self, folders1, folders2, printer: ResultPrinter):
+        super().__init__(folders1)
+        self.otherfolders = folders2
         self.printer = printer
 
-    def process(self, file):
-        file_compare_task = ImageFileCompareTask(file, self.otherfolder)
+    def start_file_compare_task(self, file) -> ImageFileCompareTask:
+        file_compare_task = ImageFileCompareTask(file, self.otherfolders)
         file_compare_task.start()
+        return file_compare_task
+
+    def process(self, file):
+        file_compare_task = self.start_file_compare_task(file)
         # print results
         self.printer.print(file_compare_task)
 
 if __name__ == '__main__':
-    ui_folder = 'setting'
-    proj_folder = 'future-skin-blue'
-    xlsx_filename = 'setting.xlsx'
+    ui_folder = ['setting']
+    proj_folder = ['future-skin-blue']
+    xlsx_filepath = 'setting.xlsx'
 
-    comparater = ImageFolderCompareTask(proj_folder, ui_folder, ExcelPrinter(xlsx_filename))
+    comparater = ImageFolderCompareTask(proj_folder, ui_folder, ExcelPrinter(xlsx_filepath))
     comparater.start()
 
 

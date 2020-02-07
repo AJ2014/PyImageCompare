@@ -24,10 +24,16 @@
     <Compile Include="LocalTest.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="PyApkReverseBuild.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="PyImgCmp.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="PyProject01.py" />
+    <Compile Include="SkinApkGenerat.py">
+      <SubType>Code</SubType>
+    </Compile>
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in
