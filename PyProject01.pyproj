@@ -24,10 +24,16 @@
     <Compile Include="LocalTest.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="PilImgDecoder.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="PyApkReverseBuild.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="PyImgCmp.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="PyImgDecoder.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="PyProject01.py" />

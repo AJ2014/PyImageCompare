@@ -2,10 +2,21 @@ import os
 
 apk_filename = 'launcher-future-skin-blue'
 
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
 # Step 1, decode apk package
-#os.system('java -jar apktool_2.4.0.jar d {}.apk'.format(apk_filename))
+print(resource_path(resource_path('apktool_2.4.0.jar')))
+os.system('java -jar {} d {}.apk'.format(resource_path('apktool_2.4.0.jar'), apk_filename))
 
-
+'''
 new_packagename = 'com.harman.hmi.launcher_future_skin_red'
 new_apkname = 'launcher-future-skin-red.apk'
 manifest_filename = 'AndroidManifest.xml'
@@ -42,6 +53,6 @@ replace_match(manifest_filepath, 'package=\"[\w.]+\"', 'package=\"{}\"'.format(n
 
 # Step 3, rename apk file
 replace_match(apktool_yml_filepath, 'apkFileName: [\w.]+', 'apkFileName: {}'.format(new_apkname))
-
+'''
 
 #os.system('java -jar apktool_2.4.0.jar b {}'.format(apk_filename))

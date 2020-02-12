@@ -1,6 +1,33 @@
+import os
 import subprocess
 from PyImgCmp import *
 import shutil
+import re
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+def get_proj_drawable_folders(proj_folder):
+    proj_res_folder = '{}\\res'.format(proj_folder)
+    proj_drawable_folders = []
+    drawable_pattern = re.compile('^.*drawable$')
+    mipmap_pattern = re.compile('^.*mipmap.*$')
+    for file in os.listdir(proj_res_folder):
+        file = os.path.join(proj_res_folder, file)
+        if os.path.isdir(file):
+            if drawable_pattern.match(str(file)) or mipmap_pattern.match(str(file)):
+                proj_drawable_folders.append(file)
+    return proj_drawable_folders
+
+APKTOOL_JAR = 'apktool_2.4.0.jar'
+apktool_filepath = resource_path(APKTOOL_JAR)
 
 def decode_apk(apk_filepath, output_folder):
     splits = apk_filepath.split('\\')
@@ -8,7 +35,7 @@ def decode_apk(apk_filepath, output_folder):
     splits = apk_filename.split('.')
     decode_folder = splits[0]
     decode_folder = '{}\\{}'.format(output_folder, decode_folder)
-    batcmd = 'java -jar apktool_2.4.0.jar d -f {} -o {}'.format(apk_filepath, decode_folder)
+    batcmd = 'java -jar {} d -f {} -o {}'.format(apktool_filepath, apk_filepath, decode_folder)
     result = subprocess.check_output(batcmd, shell=True)
     return decode_folder
 
@@ -16,16 +43,14 @@ def build_apk(decode_folder, output_folder):
     splits = decode_folder.split('\\')
     apk_filename = '{}.apk'.format(splits[len(splits) - 1])
     build_filepath = '{}\\{}'.format(output_folder, apk_filename)
-    batcmd = 'java -jar apktool_2.4.0.jar b {} -o {}'.format(decode_folder, build_filepath)
+    #aapt1 won't do png file improving, which may cause apk file too large or even failure
+    #solution 1, use -nc, won't do png file compress
+    #solution 2, use -use-aapt2, will do png file compress if needed
+    batcmd = 'java -jar {} b -use-aapt2 {} -o {}'.format(apktool_filepath, decode_folder, build_filepath)
     result = subprocess.check_output(batcmd, shell=True)
     return build_filepath
 
 class ImageReplaceTask(ImageFolderCompareTask):
-    def __init__(self, folders1, folders2, printer: ResultPrinter):
-        super().__init__(folders1)
-        self.otherfolders = folders2
-        self.printer = printer
-
     def start_file_compare_task(self, file):
         file_compare_task = super().start_file_compare_task(file)
         equal_results = file_compare_task.equal_list
@@ -33,30 +58,47 @@ class ImageReplaceTask(ImageFolderCompareTask):
             old_file = equal_results[0].imagefile
             new_file = equal_results[0].otherfile
             print('replace {} with {}'.format(old_file, new_file))
-            shutil.move(new_file, old_file)
+            if os.path.isfile(old_file):
+                # 1. Remove old file
+                try:
+                    os.remove(old_file)
+                except OSError as e:
+                    print ("Error: %s - %s." % (e.filename, e.strerror))
+            # 2. copy new file
+            shutil.copy(new_file, old_file)
+        return file_compare_task
 
-if __name__ == '__main__':
-
-    skin_template_apk = '..\\launcher-future-skin-blue.apk'
-    ui_folder = '..\\launcher'
-    output_folder = '..\\output'
-    excel_filename = 'launcher.xlsx'
-
+def main(skin_template_apk, ui_folders, output_folder, excel_filename):
+    """
+    Do image file compare between ui folders and project folders.
+    Output report excel file and new skin apk package
+    Args:
+        skin_template_apk: old skin apk package file path
+        ui_folders: new skin ui resource folders, must be a list
+        output_folder: report file and new apk file output folder
+        excel_filename: report file name
+    """
     # Step1, decode apk package
     decode_folder = decode_apk(skin_template_apk, output_folder)
     print('decode folder: ', decode_folder)
 
     # Step2, replace matched resources
-    drawable_folder = '{}\\res\\drawable'.format(decode_folder)
-    mipmap_mdpi_v4_folder = '{}\\res\\mipmap-mdpi-v4'.format(decode_folder)
+    proj_drawable_folders = get_proj_drawable_folders(decode_folder)
+    print('project drawable folders: ', proj_drawable_folders)
+
     excel_filepath = '{}\\{}'.format(output_folder, excel_filename)
-
-    proj_folders = [drawable_folder, mipmap_mdpi_v4_folder]
-    ui_folders = [ui_folder]
-    comparater = ImageFolderCompareTask(proj_folders, ui_folders, ExcelPrinter(excel_filepath))
+    comparater = ImageReplaceTask(proj_drawable_folders, ui_folders, ExcelPrinter(excel_filepath))
     comparater.start()
-
+    print('Report excel file: ', excel_filepath)
     # Step3, build apk package
     build_filepath = build_apk(decode_folder, output_folder)
     print('build apk: ', build_filepath)
 
+if __name__ == '__main__':
+
+    skin_template_apk = '..\\launcher-future-skin-blue.apk'
+    ui_folders = ['..\\launcher', '..\\common']
+    output_folder = '..\\output'
+    excel_filename = 'launcher.xlsx'
+
+    main(skin_template_apk, ui_folders, output_folder, excel_filename)
