@@ -78,7 +78,7 @@ class ImageSimpleComparater(ImageComparater):
         imginfo2 = ImageInfo(path = imagefile2, type = img2.format, width = img2.width, height = img2.height, mode = img2.mode)
         img1.close()
         img2.close()
-        if not imginfo1.type == imginfo2.type or not imginfo1.mode == imginfo2.mode or not imginfo1.width == imginfo2.width or not imginfo1.height == imginfo2.height:
+        if not imginfo1.type == imginfo2.type or not imginfo1.width == imginfo2.width or not imginfo1.height == imginfo2.height:
             return ImageCompareResult(imagefile1, imagefile2, ImageComparater.IGNORE_DIFF_SCORE, imginfo1, FileCompareResult.CODE_WARN, 'simple image info not match')
         splits = imagefile1.split('\\')
         filename1 = splits[len(splits) - 1]
