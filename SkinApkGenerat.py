@@ -46,8 +46,8 @@ def build_apk(decode_folder, output_folder):
     #aapt1 won't do png file improving, which may cause apk file too large or even failure
     #solution 1, use -nc, won't do png file compress
     #solution 2, use -use-aapt2, will do png file compress if needed
-
-    batcmd = '{} b -use-aapt2 {} -o {}'.format(apktool_filepath, decode_folder, build_filepath)
+    #add -c to Copy original files, AndroidManifest.xml, META-INF to maintian signature info
+    batcmd = '{} b -use-aapt2 -c {} -o {}'.format(apktool_filepath, decode_folder, build_filepath)
     result = subprocess.check_output(batcmd, shell=True)
     return build_filepath
 
